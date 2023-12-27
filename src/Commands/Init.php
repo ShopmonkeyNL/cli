@@ -58,6 +58,8 @@ class Init extends Command
         $newGulpFile   = getcwd() . '/gulpfile.js';
         $oldGulpConfig = $oldDir . 'gulp.config.js';
         $newGulpConfig = getcwd() . '/gulp.config.js';
+        $oldGeckoDriver = __DIR__ .'/../src/drivers/geckodriver';
+        $newGeckoDriver = getcwd() . '/geckodriver';
 
         $this->installNodeDependencies();
         $this->createFilesAndFolders();
@@ -69,6 +71,7 @@ class Init extends Command
         copy($oldWatcher, $newWatcher);
         copy($oldGulpFile, $newGulpFile);
         copy($oldGulpConfig, $newGulpConfig);
+        copy($oldGeckoDriver, $newGeckoDriver);
     }
 
     private function addRecommendedExtensions()

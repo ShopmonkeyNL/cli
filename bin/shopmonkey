@@ -13,6 +13,7 @@
     use Shopmonkeynl\ShopmonkeyCli\Commands\Watch;
     use Shopmonkeynl\ShopmonkeyCli\Commands\Auth;
     use Shopmonkeynl\ShopmonkeyCli\Commands\Init;
+    use Shopmonkeynl\ShopmonkeyCli\Commands\Theme;
     use Symfony\Component\Console\Application;
 
     $application = new Application();
@@ -21,4 +22,5 @@
     $application->add(new Watch());
     $application->add(new Auth());
     $application->add(new Init());
+    $application->add(new Theme());
     $application->run();

@@ -113,7 +113,6 @@ class Pull extends Command
 
         $response = curl_exec($curl);
 
-        curl_close($curl);
         $response = json_decode($response, true);
 
         return $response['theme_templates'];
@@ -146,7 +145,6 @@ class Pull extends Command
 
         $response = curl_exec($curl);
 
-        curl_close($curl);
         $response = json_decode($response, true);
 
         file_put_contents($this->getThemePath('settings.json'), json_encode($response['theme_settings'], JSON_PRETTY_PRINT));
@@ -175,7 +173,6 @@ class Pull extends Command
 
         $response = curl_exec($curl);
 
-        curl_close($curl);
         $response = json_decode($response, true);
 
         file_put_contents($this->getThemePath('settings_data.json'), json_encode($response['theme_settings'], JSON_PRETTY_PRINT));
@@ -209,7 +206,6 @@ class Pull extends Command
 
         $response = curl_exec($curl);
 
-        curl_close($curl);
         $response = json_decode($response, true);
 
         return $response['theme_assets'];
@@ -283,7 +279,6 @@ class Pull extends Command
 
         $response = curl_exec($curl);
 
-        curl_close($curl);
         // $response = json_decode($response, true);
 
         if (!$response) {

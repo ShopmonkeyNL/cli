@@ -9,9 +9,9 @@ class InputOutput extends SymfonyStyle
     /**
      * Ask a question and return the answer.
      */
-    public function question(string $question): string
+    public function question(string $question, ?string $default = null): string
     {
-        return $this->ask(sprintf(' ✍️  %s', $question));
+        return (string) $this->ask(sprintf(' ✍️  %s', $question), $default);
     }
 
     /**

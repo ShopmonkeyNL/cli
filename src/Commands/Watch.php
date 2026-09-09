@@ -5,6 +5,7 @@ namespace Shopmonkeynl\ShopmonkeyCli\Commands;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Shopmonkeynl\ShopmonkeyCli\Services\SettingsService;
 
 class Watch extends Command
 {
@@ -31,12 +32,15 @@ class Watch extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        // $output = null;
-        // exec('gulp watch', $output);
-        // echo $output;
+        $settingsService = new SettingsService();
+
+        if (!$settingsService->authenticate($input, $output)) {
+            return Command::FAILURE;
+        }
+
         $command = 'gulp watch';
         passthru("{$command} 2>&1");
-        // passthru('gulp watch');
+
         return Command::SUCCESS;
     }
 

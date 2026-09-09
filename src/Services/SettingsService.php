@@ -78,7 +78,9 @@ class SettingsService
             $backend_session_id = $io->question('Enter current backend session ID');
 
             $parsed_url = parse_url($shop_url);
-            $base_url = $parsed_url['scheme'] . '://' . $parsed_url['host'] . '/';
+            $base_url = (!empty($parsed_url['scheme']) && !empty($parsed_url['host']))
+                ? $parsed_url['scheme'] . '://' . $parsed_url['host'] . '/'
+                : rtrim($shop_url, '/') . '/';
 
             $settings = [
                 'theme_id' => $theme_id,
@@ -170,55 +172,82 @@ class SettingsService
         ];
     }
 
-    public function authenticate($input, $output) {
-        
-        $settings = $this->get($input, $output);
-        $io = new InputOutput($input, $output);
+    /**
+     * Check whether the stored session is still valid.
+     *
+     * Hits an authenticated endpoint and returns true only when the shop
+     * answers without an "error" payload. A missing or unreachable response
+     * counts as "not authenticated" so callers re-run the login flow.
+     */
+    public function check($settings): bool
+    {
+        if (empty($settings['shop_url']) || empty($settings['theme_id'])) {
+            return false;
+        }
 
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
-        CURLOPT_URL => $settings['shop_url'].'admin/themes/'.$settings['theme_id'].'/templates.json',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'GET',
-        CURLOPT_HTTPHEADER => array(
-            'Accept: application/json, text/plain, */*',
-            'Content-Type: application/json;charset=UTF-8',
-            'Sec-Fetch-Dest: empty',
-            'Sec-Fetch-Mode: cors',
-            'Sec-Fetch-Site: same-origin',
-            'x-csrf-token: '.$settings['csrf'],
-            'Cookie: shared_session_id='.$settings['backend_session_id'].'; backend_session_id='.$settings['backend_session_id'].'; request_method=GET'
-        ),
+            CURLOPT_URL            => $settings['shop_url'] . 'admin/themes/' . $settings['theme_id'] . '/templates.json',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING       => '',
+            CURLOPT_MAXREDIRS      => 10,
+            CURLOPT_TIMEOUT        => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST  => 'GET',
+            CURLOPT_HTTPHEADER     => array(
+                'Accept: application/json, text/plain, */*',
+                'Content-Type: application/json;charset=UTF-8',
+                'Sec-Fetch-Dest: empty',
+                'Sec-Fetch-Mode: cors',
+                'Sec-Fetch-Site: same-origin',
+                'x-csrf-token: ' . $settings['csrf'],
+                'Cookie: shared_session_id=' . $settings['backend_session_id'] . '; backend_session_id=' . $settings['backend_session_id'] . '; request_method=GET'
+            ),
         ));
 
         $response = curl_exec($curl);
-
         curl_close($curl);
-        // $response = json_decode($response, true);
 
         if (!$response) {
             return false;
-        } else {
-            $response = json_decode($response, true);
-            if (isset($response['error'])) {
-                
-                $io->info("Please log in below");
-                // $io->info(json_encode($settings, JSON_PRETTY_PRINT));
-                $settings = $this->create($input, $output);
-                $this->authenticate($input, $output);
-
-            } else {
-                $io->right("Authentication successful for '". $settings['shop_url'] ."'.");
-                return true;
-            }
         }
 
+        $response = json_decode($response, true);
+
+        return is_array($response) && !isset($response['error']);
+    }
+
+    /**
+     * Make sure we have a working session, running the login flow (clipboard →
+     * paste → per field) until the credentials check out. Returns true once
+     * authenticated, false when it gives up.
+     */
+    public function authenticate($input, $output) {
+
+        $io       = new InputOutput($input, $output);
+        $settings = $this->get($input, $output);
+
+        $attempts = 0;
+
+        while (!$this->check($settings)) {
+
+            if (++$attempts > 3) {
+                $io->wrong('Could not authenticate after 3 attempts. Aborting.');
+                return false;
+            }
+
+            $io->wrong('Your session is expired or the credentials are invalid. Please log in again.');
+
+            $settings = ($attempts === 1 && file_exists($this->file))
+                ? $this->update($input, $output)
+                : $this->create($input, $output);
+        }
+
+        $io->right("Authentication successful for '" . $settings['shop_url'] . "'.");
+
+        return true;
     }
 
 }

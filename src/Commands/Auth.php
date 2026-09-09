@@ -36,9 +36,10 @@ class Auth extends Command
     {
 
         $settingsService = new SettingsService();
-        $settingsService->authenticate($input, $output);
 
-        return Command::SUCCESS;
+        return $settingsService->authenticate($input, $output)
+            ? Command::SUCCESS
+            : Command::FAILURE;
     }
 
 }

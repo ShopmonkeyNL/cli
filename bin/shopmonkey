@@ -30,6 +30,7 @@
     use Shopmonkeynl\ShopmonkeyCli\Commands\Init;
     use Shopmonkeynl\ShopmonkeyCli\Commands\Update;
     use Shopmonkeynl\ShopmonkeyCli\Commands\Doctor;
+    use Shopmonkeynl\ShopmonkeyCli\Commands\Check;
 
     $application = new Application();
 
@@ -39,4 +40,5 @@
     $application->add(new Init());
     $application->add(new Update());
     $application->add(new Doctor());
+    $application->add(new Check());
     $application->run();

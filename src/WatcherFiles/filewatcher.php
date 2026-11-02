@@ -41,6 +41,15 @@ class ThemeFiles
          }
       }
 
+      // Eerst controleren op syntaxfouten e.d. (SHOPMONKEY_SKIP_CHECK=1 slaat dit over).
+      if ($type == 'template' && in_array($settings['trigger'], ['change', 'add']) && !getenv('SHOPMONKEY_SKIP_CHECK')) {
+         $problems = $this->runCheck($settings['path']);
+         if ($problems !== null) {
+            echo "Error: '" . $name . "' was NOT uploaded because the check failed (SHOPMONKEY_SKIP_CHECK=1 uploads it anyway):\n" . $problems . "\n";
+            return;
+         }
+      }
+
       if ($settings['trigger'] == 'change') {
          $result = $this->updateFile($settings);
          $action = 'updated';
@@ -72,6 +81,36 @@ class ThemeFiles
             }
          }
       }
+   }
+
+   /**
+    * Draait "shopmonkey check" op het bestand. Geeft null terug als het in orde is
+    * (of als de CLI niet gevonden kan worden), anders de gevonden fouten.
+    */
+   private function runCheck($path)
+   {
+      $pointer = __DIR__ . '/cli.php';
+      if (!is_file($pointer)) {
+         return null;
+      }
+
+      $cli = include $pointer;
+      if (empty($cli['php']) || empty($cli['cli']) || !is_file($cli['cli'])) {
+         return null;
+      }
+
+      $command = escapeshellarg($cli['php']) . ' ' . escapeshellarg($cli['cli']) . ' check --short --no-ansi --no-interaction ' . escapeshellarg($path) . ' 2>&1';
+      exec($command, $lines, $exitCode);
+
+      $output = trim(implode("\n", $lines));
+      if ($exitCode === 0) {
+         if ($output !== '') {
+            echo "Warning: " . trim(preg_replace('/\s+/', ' ', $output)) . "\n";
+         }
+         return null;
+      }
+
+      return $output !== '' ? $output : 'check failed';
    }
 
    private function updateFile($settings)

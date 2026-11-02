@@ -11,7 +11,7 @@ class Application extends BaseApplication
      *
      * @var string
      */
-    public const VERSION = '3.5.0';
+    public const VERSION = '3.6.0';
 
     /**
      * The Composer package name, used by the "update" command.

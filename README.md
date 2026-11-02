@@ -18,6 +18,7 @@ Zorg dat `~/.composer/vendor/bin` in je `PATH` staat.
 | `shopmonkey auth` | Sessie controleren en (opnieuw) inloggen zolang de gegevens niet kloppen |
 | `shopmonkey pull` | Huidige thema ophalen naar `./theme` (`--force` slaat de controle op lokale wijzigingen over) |
 | `shopmonkey watch` | Sessie controleren, daarna bestanden watchen en pushen naar de shop |
+| `shopmonkey check [bestanden]` | Controleert templates op Twig-syntaxfouten, ontbrekende includes, niet-gesloten `<script>`/`<style>` en de 64 KB-limiet |
 | `shopmonkey doctor` | Controleert versie, PHP, node/gulp, sessie, shop en bijna-te-grote bestanden |
 | `shopmonkey update` | De CLI zelf bijwerken naar de laatste versie |
 | `shopmonkey --version` | Geïnstalleerde versie tonen |
@@ -45,6 +46,7 @@ watcher pas als de sessie klopt.
   - `pull` schrijft een afgekapt bestand niet weg (je lokale versie blijft staan) en meldt het als fout.
   - `watch` uploadt geen template van 64 KB of groter en geeft een foutmelding. Bewust toch uploaden kan met `SHOPMONKEY_ALLOW_LARGE=1`.
   - Vanaf 80% van de limiet krijg je een waarschuwing, zodat je op tijd kunt splitsen in snippets.
+- **Check voor upload:** `watch` draait `shopmonkey check` op elke template voordat die wordt geüpload. Bij een fout (bijv. een niet-gesloten `{% if %}`, of een bestand dat midden in een `<script>` eindigt) wordt er niet geüpload. Waarschuwingen blokkeren niet. Overslaan kan met `SHOPMONKEY_SKIP_CHECK=1`.
 - **Upload-fouten:** `watch` toont de echte melding van de shop, en meldt duidelijk als je sessie verlopen is (voorheen kon dat als "Success" verschijnen).
 
 ## Debuggen

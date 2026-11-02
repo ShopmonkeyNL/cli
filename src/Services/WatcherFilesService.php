@@ -42,6 +42,8 @@ class WatcherFilesService
      */
     public function sync() {
 
+        $this->writeCliPointer();
+
         if ($this->isCurrent()) {
             return 'unchanged';
         }
@@ -56,6 +58,27 @@ class WatcherFilesService
         copy($this->packagedFile(), $project);
 
         return $existed ? 'updated' : 'created';
+
+    }
+
+    /**
+     * Tell the standalone upload script where this CLI and PHP live, so it can
+     * run "check" before uploading. Rewritten on every sync, so it follows
+     * updates of the CLI.
+     */
+    private function writeCliPointer() {
+
+        $directory = dirname($this->projectFile());
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        $cli = realpath(__DIR__ . '/../../bin/shopmonkey');
+        $code = "<?php\n\nreturn " . var_export(['php' => PHP_BINARY, 'cli' => $cli ?: null], true) . ";\n";
+
+        if (!is_file($directory . '/cli.php') || file_get_contents($directory . '/cli.php') !== $code) {
+            file_put_contents($directory . '/cli.php', $code);
+        }
 
     }
 

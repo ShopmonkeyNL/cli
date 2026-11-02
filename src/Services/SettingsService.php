@@ -208,7 +208,6 @@ class SettingsService
         ));
 
         $response = curl_exec($curl);
-        curl_close($curl);
 
         if (!$response) {
             return false;

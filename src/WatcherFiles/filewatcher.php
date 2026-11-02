@@ -77,7 +77,6 @@ class ThemeFiles
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
       $response = curl_exec($ch);
-      curl_close($ch);
 
       $response = json_decode($response, true);
 
@@ -133,7 +132,6 @@ class ThemeFiles
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
       $response = curl_exec($ch);
-      curl_close($ch);
 
       $response = json_decode($response, true);
 
@@ -170,7 +168,6 @@ class ThemeFiles
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
       $response = curl_exec($ch);
-      curl_close($ch);
 
       $response = json_decode($response, true);
 

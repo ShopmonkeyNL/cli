@@ -2,12 +2,12 @@
 
 namespace Shopmonkeynl\ShopmonkeyCli\Commands;
 
-use Exception;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Shopmonkeynl\ShopmonkeyCli\Services\SettingsService;
 use Shopmonkeynl\ShopmonkeyCli\Services\InputOutput;
+use Shopmonkeynl\ShopmonkeyCli\Services\ProjectSetupService;
+use Shopmonkeynl\ShopmonkeyCli\Services\SettingsService;
 
 class Init extends Command
 {
@@ -23,7 +23,7 @@ class Init extends Command
      *
      * @var string
      */
-    protected static $defaultDescription = 'Authenticate and install dependencies.';
+    protected static $defaultDescription = 'Authenticate and (re)install dependencies. Done automatically on the first pull or watch.';
 
     /**
      * Execute the command
@@ -34,114 +34,20 @@ class Init extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        
+
         $io              = new InputOutput($input, $output);
         $settingsService = new SettingsService();
-        $settingsService->authenticate($input, $output);
 
-        $this->installWatcherFiles();
-        $this->addRecommendedExtensions();
-        $this->createPrettierConfig();
+        if (!$settingsService->authenticate($input, $output)) {
+            return Command::FAILURE;
+        }
+
+        // An explicit init resets the project files to the defaults.
+        (new ProjectSetupService())->setup($io, true);
 
         $io->right("Dependencies installed.");
 
         return Command::SUCCESS;
-    }
-
-    private function installWatcherFiles()
-    {
-
-        $oldDir        = __DIR__ . '/../WatcherFiles/';
-        $oldWatcher    = $oldDir . 'filewatcher.php';
-        $newWatcher    = getcwd() . '/.functions/filewatcher.php';
-        $oldGulpFile   = $oldDir . 'gulpfile.js';
-        $newGulpFile   = getcwd() . '/gulpfile.js';
-        $oldGulpConfig = $oldDir . 'gulp.config.js';
-        $newGulpConfig = getcwd() . '/gulp.config.js';
-
-        $this->installNodeDependencies();
-        $this->createFilesAndFolders();
-
-        if (!is_dir(getcwd() . '/.functions')) {
-            mkdir((getcwd() . '/.functions'), 0755, true);
-        }
-
-        copy($oldWatcher, $newWatcher);
-        copy($oldGulpFile, $newGulpFile);
-        copy($oldGulpConfig, $newGulpConfig);
-    }
-
-    private function addRecommendedExtensions()
-    {
-        $pathName         = getcwd() . '/.vscode';
-        $extensions       = [
-            'recommendations' => [
-                'esbenp.prettier-vscode',
-                'dbaeumer.vscode-eslint',
-                'mblode.twig-language-2',
-                'formulahendry.auto-rename-tag'
-            ]
-        ];
-        $extensionsString = json_encode($extensions, JSON_PRETTY_PRINT);
-
-        if (!is_dir($pathName)) {
-            mkdir(($pathName), 0755, true);
-        }
-
-        // Create and write extensions json file
-        if (!file_exists($pathName . '/extensions.json')) {
-            touch($pathName . '/extensions.json');
-        }
-
-        $extensionsFile = fopen($pathName . '/extensions.json', 'w');
-        fwrite($extensionsFile, $extensionsString);
-        fclose($extensionsFile);
-    }
-
-    private function createPrettierConfig()
-    {
-        $pathName       = getcwd();
-        $prettierConfig = [
-            'trailingComma'          => 'es5',
-            'tabWidth'               => 2,
-            'semi'                   => true,
-            'singleQuote'            => true,
-            'bracketSpacing'         => true,
-            'bracketSameLine'        => false,
-            'requirePragma'          => true,
-            'singleAttributePerLine' => true,
-        ];
-
-        if (!file_exists($pathName . '/.prettierrc.json')) {
-            touch($pathName . '/.prettierrc.json');
-        }
-
-        $prettierConfigFile = fopen($pathName . '/.prettierrc.json', 'w');
-        fwrite($prettierConfigFile, json_encode($prettierConfig, JSON_PRETTY_PRINT));
-        fclose($prettierConfigFile);
-    }
-
-    private function installNodeDependencies()
-    {
-        try {
-            // Install pnpm for faster package management
-            passthru('npm install -g pnpm');
-
-            // Install necessary gulp packages
-            passthru('pnpm add -D gulp gulp-exec && pnpm add -g gulp-cli && pnpm update -g gulp-cli');
-        } catch (Exception $e) {
-            echo $e->getMessage();
-        }
-    }
-
-    private function createFilesAndFolders()
-    {
-        try {
-            passthru('touch .gitignore && echo "/node_modules\nconfig.json" >> .gitignore');
-            passthru('mkdir src && mkdir src/sass &&');
-        } catch (Exception $e) {
-            echo $e->getMessage();
-        }
     }
 
 }

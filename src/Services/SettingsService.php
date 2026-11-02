@@ -35,6 +35,10 @@ class SettingsService
         $current_settings = json_decode($current_settings,true);
 
         $clipboard = $this->credentialsFromClipboard($io);
+        if ($clipboard !== null && !$this->confirmShopSwitch($io, $current_settings, $clipboard)) {
+            $clipboard = null;
+        }
+
         if ($clipboard !== null) {
             $new_settings = array_merge($current_settings, $clipboard);
             file_put_contents($file, json_encode($new_settings, JSON_PRETTY_PRINT));
@@ -58,6 +62,7 @@ class SettingsService
 
         $io = new InputOutput($input, $output);
         $file = $this->file;
+        $current = $this->read();
 
         $settings = $this->credentialsFromClipboard($io);
 
@@ -72,15 +77,12 @@ class SettingsService
         }
 
         if ($settings === null) {
-            $shop_url = $io->question('Enter shop URL');
-            $theme_id = $io->question('Enter theme ID');
+            $shop_url = $io->question('Enter shop URL', $current['shop_url'] ?? null);
+            $theme_id = $io->question('Enter theme ID', isset($current['theme_id']) ? (string) $current['theme_id'] : null);
             $csrf = $io->question('Enter current CSRF token');
             $backend_session_id = $io->question('Enter current backend session ID');
 
-            $parsed_url = parse_url($shop_url);
-            $base_url = (!empty($parsed_url['scheme']) && !empty($parsed_url['host']))
-                ? $parsed_url['scheme'] . '://' . $parsed_url['host'] . '/'
-                : rtrim($shop_url, '/') . '/';
+            $base_url = $this->baseUrl($shop_url) ?? rtrim($shop_url, '/') . '/';
 
             $settings = [
                 'theme_id' => $theme_id,
@@ -90,9 +92,45 @@ class SettingsService
             ];
         }
 
+        if ($current !== null && !$this->confirmShopSwitch($io, $current, $settings)) {
+            return $current;
+        }
+
         file_put_contents($file, json_encode($settings, JSON_PRETTY_PRINT));
 
         return $settings;
+
+    }
+
+    /**
+     * The stored settings, or null when there is no (valid) config.json.
+     * Never prompts, so it is safe to use from non-interactive commands.
+     */
+    public function read() {
+
+        if (!file_exists($this->file)) {
+            return null;
+        }
+
+        $settings = json_decode(file_get_contents($this->file), true);
+
+        return is_array($settings) ? $settings : null;
+
+    }
+
+    /**
+     * Ask for confirmation when new credentials belong to a different shop or
+     * theme than the stored ones. Returns true when it is fine to continue.
+     */
+    private function confirmShopSwitch($io, $current, $new) {
+
+        $guard = new ShopGuardService();
+
+        if (empty($current['shop_url']) || empty($current['theme_id']) || !$guard->differs($current, $new)) {
+            return true;
+        }
+
+        return $guard->confirmSwitch($io, $current, $new);
 
     }
 
@@ -144,6 +182,19 @@ class SettingsService
     }
 
     /**
+     * Reduce a URL to "scheme://host[:port]/", or null when it isn't one.
+     */
+    private function baseUrl($url)
+    {
+        $parsed_url = parse_url((string) $url);
+        if (empty($parsed_url['scheme']) || empty($parsed_url['host'])) {
+            return null;
+        }
+
+        return $parsed_url['scheme'] . '://' . $parsed_url['host'] . (isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '') . '/';
+    }
+
+    /**
      * Validate and normalise a raw JSON credentials string.
      */
     private function parseCredentials($raw)
@@ -159,14 +210,14 @@ class SettingsService
             }
         }
 
-        $parsed_url = parse_url($data['shop_url']);
-        if (empty($parsed_url['scheme']) || empty($parsed_url['host'])) {
+        $base_url = $this->baseUrl($data['shop_url']);
+        if ($base_url === null) {
             return null;
         }
 
         return [
             'theme_id'           => (string) $data['theme_id'],
-            'shop_url'           => $parsed_url['scheme'] . '://' . $parsed_url['host'] . '/',
+            'shop_url'           => $base_url,
             'csrf'               => (string) $data['csrf'],
             'backend_session_id' => (string) $data['backend_session_id'],
         ];
@@ -208,7 +259,6 @@ class SettingsService
         ));
 
         $response = curl_exec($curl);
-        curl_close($curl);
 
         if (!$response) {
             return false;

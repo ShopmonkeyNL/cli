@@ -29,6 +29,7 @@
     use Shopmonkeynl\ShopmonkeyCli\Commands\Auth;
     use Shopmonkeynl\ShopmonkeyCli\Commands\Init;
     use Shopmonkeynl\ShopmonkeyCli\Commands\Update;
+    use Shopmonkeynl\ShopmonkeyCli\Commands\Doctor;
 
     $application = new Application();
 
@@ -37,4 +38,5 @@
     $application->add(new Auth());
     $application->add(new Init());
     $application->add(new Update());
+    $application->add(new Doctor());
     $application->run();

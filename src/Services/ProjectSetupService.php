@@ -58,7 +58,6 @@ class ProjectSetupService
     public function setup($io, $overwrite = false) {
 
         $this->installNodeDependencies($io);
-        $this->ensureGulpCli($io);
         $this->createFilesAndFolders();
         $this->installWatcherFiles($overwrite);
         $this->addRecommendedExtensions($overwrite);
@@ -67,60 +66,15 @@ class ProjectSetupService
     }
 
     /**
-     * Whether the global gulp-cli can't drive this project's local gulp.
-     *
-     * gulp-cli 2.x only knows gulp 3 and 4, so with the gulp 5 that setup
-     * installs it stops with "Unsupported gulp version". "gulp --version" does
-     * not run that check, and running a task would start the watcher, so the
-     * versions are compared instead. Null when it is fine or can't be told.
+     * The gulp to run: the one installed in this project (gulp 5 ships its own
+     * gulp-cli), so no global gulp-cli is needed and its PATH and version
+     * problems can't get in the way. Falls back to a global gulp for projects
+     * that don't have a local one. The path is relative, so run it from the
+     * project root.
      */
-    public function gulpProblem() {
+    public function gulpCommand() {
 
-        $package = getcwd() . '/node_modules/gulp/package.json';
-        if (!$this->commandExists('gulp') || !is_file($package)) {
-            return null;
-        }
-
-        $output = (string) @shell_exec('gulp --version 2>&1');
-        $local  = json_decode((string) @file_get_contents($package), true)['version'] ?? null;
-
-        $unsupported = stripos($output, 'Unsupported gulp version') !== false;
-
-        if (!$unsupported && $local !== null && preg_match('/CLI version:\s*(\d+)\./i', $output, $cli)) {
-            $unsupported = (int) $cli[1] < 3 && (int) explode('.', $local)[0] >= 5;
-        }
-
-        return $unsupported
-            ? 'The global gulp-cli is too old for the gulp in this project ("Unsupported gulp version").'
-            : null;
-
-    }
-
-    /**
-     * Update the global gulp-cli when it is too old for the local gulp.
-     *
-     * @return bool true when gulp works afterwards
-     */
-    public function ensureGulpCli($io) {
-
-        if ($this->gulpProblem() === null) {
-            return true;
-        }
-
-        $io->info(' 🔧  The global gulp-cli is too old for this project, updating it...');
-        $this->run($this->commandExists('pnpm') ? 'pnpm add -g gulp-cli@latest' : 'npm install -g gulp-cli@latest', $io);
-
-        if ($this->gulpProblem() === null) {
-            return true;
-        }
-
-        $path = trim((string) @shell_exec('command -v gulp 2>/dev/null'));
-        $io->warning(sprintf(
-            "gulp still reports \"Unsupported gulp version\". An old gulp is being run from %s.\nRemove it (for example \"npm uninstall -g gulp-cli\") and run \"pnpm add -g gulp-cli@latest\", then try again.",
-            $path !== '' ? $path : 'your PATH'
-        ));
-
-        return false;
+        return is_file(getcwd() . '/node_modules/.bin/gulp') ? './node_modules/.bin/gulp' : 'gulp';
 
     }
 
@@ -131,19 +85,28 @@ class ProjectSetupService
             return;
         }
 
-        // Install pnpm for faster package management
-        if (!$this->commandExists('pnpm')) {
-            $this->run('npm install -g pnpm', $io);
+        if ($this->hasLocalGulp()) {
+            return;
         }
 
-        // Install the gulp packages this project needs
-        if (!is_dir(getcwd() . '/node_modules/gulp') || !is_dir(getcwd() . '/node_modules/gulp-exec')) {
-            $this->run('pnpm add -D gulp gulp-exec', $io);
+        // Everything goes into the project itself; nothing is installed globally.
+        $hasNpm = $this->commandExists('npm');
+
+        if ($this->commandExists('pnpm') && $this->run('pnpm add -D gulp gulp-exec', $io, !$hasNpm) && $this->hasLocalGulp()) {
+            return;
         }
 
-        if (!$this->commandExists('gulp')) {
-            $this->run('pnpm add -g gulp-cli', $io);
+        if ($hasNpm) {
+            $this->run('npm install --save-dev gulp gulp-exec', $io);
+        } elseif (!$this->commandExists('pnpm')) {
+            $io->warning('Neither pnpm nor npm was found, so gulp could not be installed.');
         }
+
+    }
+
+    private function hasLocalGulp() {
+
+        return is_dir(getcwd() . '/node_modules/gulp') && is_dir(getcwd() . '/node_modules/gulp-exec');
 
     }
 
@@ -242,13 +205,15 @@ class ProjectSetupService
 
     }
 
-    private function run($command, $io) {
+    private function run($command, $io, $warn = true) {
 
         // pnpm/npm print "Update available!" notices that only confuse people during setup.
         passthru('npm_config_update_notifier=false ' . $command, $exitCode);
 
         if ($exitCode !== 0) {
-            $io->warning(sprintf('"%s" failed (exit code %d). You can retry with "shopmonkey init".', $command, $exitCode));
+            if ($warn) {
+                $io->warning(sprintf('"%s" failed (exit code %d). You can retry with "shopmonkey init".', $command, $exitCode));
+            }
             return false;
         }
 

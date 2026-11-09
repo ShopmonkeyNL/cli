@@ -17,12 +17,34 @@ class ProjectSetupService
      */
     public function isSetUp() {
 
-        $root = getcwd();
+        return count($this->missing()) === 0;
 
-        return is_file($root . '/gulpfile.js')
-            && is_file($root . '/.functions/filewatcher.php')
-            && is_dir($root . '/node_modules/gulp')
-            && is_dir($root . '/node_modules/gulp-exec');
+    }
+
+    /**
+     * What "watch" needs that this folder doesn't have yet.
+     *
+     * @return string[]
+     */
+    public function missing() {
+
+        $root    = getcwd();
+        $missing = [];
+
+        if (!is_file($root . '/gulpfile.js')) {
+            $missing[] = 'gulpfile.js';
+        }
+        if (!is_file($root . '/.functions/filewatcher.php')) {
+            $missing[] = '.functions/filewatcher.php';
+        }
+        if (!is_dir($root . '/node_modules/gulp')) {
+            $missing[] = 'node_modules/gulp';
+        }
+        if (!is_dir($root . '/node_modules/gulp-exec')) {
+            $missing[] = 'node_modules/gulp-exec';
+        }
+
+        return $missing;
 
     }
 
@@ -163,7 +185,8 @@ class ProjectSetupService
 
     private function run($command, $io) {
 
-        passthru($command, $exitCode);
+        // pnpm/npm print "Update available!" notices that only confuse people during setup.
+        passthru('npm_config_update_notifier=false ' . $command, $exitCode);
 
         if ($exitCode !== 0) {
             $io->warning(sprintf('"%s" failed (exit code %d). You can retry with "shopmonkey init".', $command, $exitCode));

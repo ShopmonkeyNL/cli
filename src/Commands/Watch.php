@@ -71,6 +71,11 @@ class Watch extends Command
 
         $sizeService->report($io, $sizeService->scan(getcwd() . '/theme'));
 
+        // An old global gulp-cli can't start the gulp 5 that setup installs.
+        if (!$setup->ensureGulpCli($io)) {
+            return Command::FAILURE;
+        }
+
         $command = 'gulp watch';
         passthru("{$command} 2>&1");
 

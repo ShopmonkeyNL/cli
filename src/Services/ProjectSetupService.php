@@ -17,12 +17,34 @@ class ProjectSetupService
      */
     public function isSetUp() {
 
-        $root = getcwd();
+        return count($this->missing()) === 0;
 
-        return is_file($root . '/gulpfile.js')
-            && is_file($root . '/.functions/filewatcher.php')
-            && is_dir($root . '/node_modules/gulp')
-            && is_dir($root . '/node_modules/gulp-exec');
+    }
+
+    /**
+     * What "watch" needs that this folder doesn't have yet.
+     *
+     * @return string[]
+     */
+    public function missing() {
+
+        $root    = getcwd();
+        $missing = [];
+
+        if (!is_file($root . '/gulpfile.js')) {
+            $missing[] = 'gulpfile.js';
+        }
+        if (!is_file($root . '/.functions/filewatcher.php')) {
+            $missing[] = '.functions/filewatcher.php';
+        }
+        if (!is_dir($root . '/node_modules/gulp')) {
+            $missing[] = 'node_modules/gulp';
+        }
+        if (!is_dir($root . '/node_modules/gulp-exec')) {
+            $missing[] = 'node_modules/gulp-exec';
+        }
+
+        return $missing;
 
     }
 
@@ -36,10 +58,69 @@ class ProjectSetupService
     public function setup($io, $overwrite = false) {
 
         $this->installNodeDependencies($io);
+        $this->ensureGulpCli($io);
         $this->createFilesAndFolders();
         $this->installWatcherFiles($overwrite);
         $this->addRecommendedExtensions($overwrite);
         $this->createPrettierConfig($overwrite);
+
+    }
+
+    /**
+     * Whether the global gulp-cli can't drive this project's local gulp.
+     *
+     * gulp-cli 2.x only knows gulp 3 and 4, so with the gulp 5 that setup
+     * installs it stops with "Unsupported gulp version". "gulp --version" does
+     * not run that check, and running a task would start the watcher, so the
+     * versions are compared instead. Null when it is fine or can't be told.
+     */
+    public function gulpProblem() {
+
+        $package = getcwd() . '/node_modules/gulp/package.json';
+        if (!$this->commandExists('gulp') || !is_file($package)) {
+            return null;
+        }
+
+        $output = (string) @shell_exec('gulp --version 2>&1');
+        $local  = json_decode((string) @file_get_contents($package), true)['version'] ?? null;
+
+        $unsupported = stripos($output, 'Unsupported gulp version') !== false;
+
+        if (!$unsupported && $local !== null && preg_match('/CLI version:\s*(\d+)\./i', $output, $cli)) {
+            $unsupported = (int) $cli[1] < 3 && (int) explode('.', $local)[0] >= 5;
+        }
+
+        return $unsupported
+            ? 'The global gulp-cli is too old for the gulp in this project ("Unsupported gulp version").'
+            : null;
+
+    }
+
+    /**
+     * Update the global gulp-cli when it is too old for the local gulp.
+     *
+     * @return bool true when gulp works afterwards
+     */
+    public function ensureGulpCli($io) {
+
+        if ($this->gulpProblem() === null) {
+            return true;
+        }
+
+        $io->info(' 🔧  The global gulp-cli is too old for this project, updating it...');
+        $this->run($this->commandExists('pnpm') ? 'pnpm add -g gulp-cli@latest' : 'npm install -g gulp-cli@latest', $io);
+
+        if ($this->gulpProblem() === null) {
+            return true;
+        }
+
+        $path = trim((string) @shell_exec('command -v gulp 2>/dev/null'));
+        $io->warning(sprintf(
+            "gulp still reports \"Unsupported gulp version\". An old gulp is being run from %s.\nRemove it (for example \"npm uninstall -g gulp-cli\") and run \"pnpm add -g gulp-cli@latest\", then try again.",
+            $path !== '' ? $path : 'your PATH'
+        ));
+
+        return false;
 
     }
 
@@ -163,7 +244,8 @@ class ProjectSetupService
 
     private function run($command, $io) {
 
-        passthru($command, $exitCode);
+        // pnpm/npm print "Update available!" notices that only confuse people during setup.
+        passthru('npm_config_update_notifier=false ' . $command, $exitCode);
 
         if ($exitCode !== 0) {
             $io->warning(sprintf('"%s" failed (exit code %d). You can retry with "shopmonkey init".', $command, $exitCode));

@@ -99,6 +99,10 @@ class Doctor extends Command
         $this->tool($io, 'node', 'node -v', true);
         $this->tool($io, 'pnpm', 'pnpm -v', false);
         $this->tool($io, 'gulp', 'gulp --version', true);
+        $gulpProblem = (new ProjectSetupService())->gulpProblem();
+        if ($gulpProblem !== null) {
+            $this->fail($io, 'gulp + project', $gulpProblem . ' Run "shopmonkey watch" to update it, or: pnpm add -g gulp-cli@latest');
+        }
     }
 
     private function checkProject($io)
@@ -138,10 +142,11 @@ class Doctor extends Command
             $this->warn($io, 'Upload script', 'outdated (updated on the next "shopmonkey watch")');
         }
 
-        if ((new ProjectSetupService())->isSetUp()) {
+        $missing = (new ProjectSetupService())->missing();
+        if (!$missing) {
             $this->ok($io, 'Gulp setup', 'gulpfile.js, upload script and gulp packages found');
         } else {
-            $this->warn($io, 'Gulp setup', 'not set up yet (done automatically on the next pull or watch, or run "shopmonkey init")');
+            $this->warn($io, 'Gulp setup', sprintf('missing: %s (set up automatically on the next pull or watch, or run "shopmonkey init")', implode(', ', $missing)));
         }
 
         $sizeService = new FileSizeService();

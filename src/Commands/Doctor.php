@@ -99,6 +99,10 @@ class Doctor extends Command
         $this->tool($io, 'node', 'node -v', true);
         $this->tool($io, 'pnpm', 'pnpm -v', false);
         $this->tool($io, 'gulp', 'gulp --version', true);
+        $gulpProblem = (new ProjectSetupService())->gulpProblem();
+        if ($gulpProblem !== null) {
+            $this->fail($io, 'gulp + project', $gulpProblem . ' Run "shopmonkey watch" to update it, or: pnpm add -g gulp-cli@latest');
+        }
     }
 
     private function checkProject($io)
